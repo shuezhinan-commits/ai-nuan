@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>AI 小暖 - 健康数据助手</title>
+<style>
+  :root {
+    --bg: #0a0e17;
+    --card: rgba(255,255,255,0.06);
+    --blur: blur(20px);
+    --accent: #00d4aa;
+    --accent2: #7c5cfc;
+    --text: #e0e0e0;
+    --text2: #8892a4;
+    --danger: #ff4757;
+    --warn: #ffa502;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, 'PingFang SC', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+    padding-bottom: 80px;
+  }
+  .page { display: none; padding: 20px 16px; min-height: 100vh; }
+  .page.active { display: block; }
+
+  /* Nav */
+  .nav {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+    background: rgba(10,14,23,0.95);
+    backdrop-filter: var(--blur);
+    border-top: 1px solid rgba(255,255,255,0.08);
+    display: flex; justify-content: space-around;
+    padding: 8px 0 env(safe-area-inset-bottom);
+  }
+  .nav-item {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 4px; font-size: 11px; color: var(--text2);
+    cursor: pointer; padding: 4px 16px; border: none;
+    background: none; transition: color 0.2s;
+  }
+  .nav-item.active { color: var(--accent); }
+  .nav-item svg { width: 22px; height: 22px; }
+
+  /* Card */
+  .card {
+    background: var(--card); backdrop-filter: var(--blur);
+    border-radius: 16px; border: 1px solid rgba(255,255,255,0.08);
+    padding: 20px; margin-bottom: 16px;
+  }
+
+  /* Button */
+  .btn {
+    display: block; width: 100%; padding: 14px;
+    border-radius: 12px; border: none; font-size: 16px;
+    font-weight: 600; cursor: pointer; transition: all 0.2s;
+    text-align: center; background: var(--accent); color: #000;
+  }
+  .btn:active { opacity: 0.8; transform: scale(0.98); }
+  .btn.outline {
+    background: transparent; border: 1.5px solid var(--accent);
+    color: var(--accent);
+  }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Input */
+  .input {
+    width: 100%; padding: 14px 16px; border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.04); color: var(--text);
+    font-size: 15px; outline: none; margin-bottom: 12px;
+  }
+  .input:focus { border-color: var(--accent); }
+
+  /* Upload */
+  .upload-zone {
+    border: 2px dashed rgba(255,255,255,0.15);
+    border-radius: 16px; padding: 40px 20px;
+    text-align: center; cursor: pointer; transition: all 0.2s;
+    margin-bottom: 16px;
+  }
+  .upload-zone:hover, .upload-zone.dragover {
+    border-color: var(--accent); background: rgba(0,212,170,0.05);
+  }
+  .upload-zone svg { width: 48px; height: 48px; color: var(--text2); margin-bottom: 12px; }
+
+  /* Preview */
+  .preview-img {
+    width: 100%; max-height: 300px; object-fit: contain;
+    border-radius: 12px; margin-bottom: 12px; display: none;
+  }
+
+  /* Indicator */
+  .indicator-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .indicator-name { font-size: 14px; }
+  .indicator-val { font-size: 14px; font-weight: 600; }
+  .indicator-up { color: var(--danger); }
+  .indicator-down { color: var(--accent); }
+  .indicator-normal { color: var(--text2); }
+
+  /* Status Badge */
+  .badge {
+    display: inline-block; padding: 2px 10px; border-radius: 20px;
+    font-size: 12px; font-weight: 500;
+  }
+  .badge-pending { background: rgba(255,165,2,0.15); color: var(--warn); }
+  .badge-done { background: rgba(0,212,170,0.15); color: var(--accent); }
+
+  /* Loading */
+  .spinner {
+    width: 32px; height: 32px; border: 3px solid rgba(255,255,255,0.1);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin 0.8s linear infinite; margin: 20px auto;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Toast */
+  .toast {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    padding: 12px 24px; border-radius: 12px; z-index: 999;
+    font-size: 14px; pointer-events: none; opacity: 0;
+    transition: opacity 0.3s;
+    background: var(--accent); color: #000; font-weight: 500;
+  }
+  .toast.show { opacity: 1; }
+  .toast.error { background: var(--danger); color: #fff; }
+
+  /* Chat */
+  .chat-area { margin-bottom: 16px; max-height: 60vh; overflow-y: auto; }
+  .chat-msg { margin-bottom: 12px; display: flex; gap: 8px; }
+  .chat-msg.user { justify-content: flex-end; }
+  .chat-bubble {
+    max-width: 80%; padding: 12px 16px; border-radius: 16px;
+    font-size: 14px; line-height: 1.6;
+  }
+  .chat-msg.assistant .chat-bubble {
+    background: var(--card); border: 1px solid rgba(255,255,255,0.08);
+  }
+  .chat-msg.user .chat-bubble {
+    background: var(--accent); color: #000;
+  }
+
+  .title { font-size: 20px; font-weight: 700; margin-bottom: 16px; }
+  .sub { font-size: 13px; color: var(--text2); margin-bottom: 8px; }
+
+  /* Admin Table */
+  .admin-table { width: 100%; font-size: 13px; border-collapse: collapse; }
+  .admin-table th { text-align: left; padding: 10px 8px; color: var(--text2); border-bottom: 2px solid rgba(255,255,255,0.1); }
+  .admin-table td { padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .clickable { color: var(--accent); cursor: pointer; }
+</style>
+</head>
+<body>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- ==================== Page 1: Upload ==================== -->
+<div class="page active" id="page-upload">
+  <div class="title">上传体检报告</div>
+
+  <input class="input" type="text" id="customerName" placeholder="客户姓名" />
+  <input class="input" type="tel" id="customerPhone" placeholder="手机号码" maxlength="11" />
+
+  <div class="upload-zone" id="uploadZone">
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+    </svg>
+    <div>点击上传体检报告图片</div>
+    <div style="font-size:12px;color:var(--text2);margin-top:8px">支持 JPG / PNG / PDF</div>
+  </div>
+  <input type="file" id="fileInput" accept="image/*,.pdf" style="display:none" />
+  <img class="preview-img" id="previewImg" />
+
+  <button class="btn" id="submitBtn" disabled>提交分析</button>
+  <div class="spinner" id="loadingSpinner" style="display:none"></div>
+
+  <div id="resultCard" style="display:none">
+    <div class="card">
+      <div class="sub">识别结果</div>
+      <div id="indicatorList"></div>
+    </div>
+    <button class="btn outline" style="margin-top:16px" onclick="resetForm()">继续上传</button>
+  </div>
+</div>
+
+<!-- ==================== Page 2: Chat ==================== -->
+<div class="page" id="page-chat">
+  <div class="title">健康知识问答</div>
+  <div class="chat-area" id="chatArea">
+    <div class="chat-msg assistant">
+      <div class="chat-bubble">你好，我是 AI 小暖。可以问我关于体检指标解读、健康生活方式等方面的问题。请注意，本助手不提供医疗诊断建议。</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px">
+    <input class="input" type="text" id="chatInput" placeholder="输入问题..." style="margin:0;flex:1" />
+    <button class="btn" style="width:auto;padding:14px 20px" onclick="sendChat()">发送</button>
+  </div>
+</div>
+
+<!-- ==================== Page 3: Admin Login ==================== -->
+<div class="page" id="page-admin-login">
+  <div style="max-width:360px;margin:80px auto">
+    <div class="title" style="text-align:center">后台管理</div>
+    <input class="input" type="text" id="adminUser" placeholder="管理员账号" />
+    <input class="input" type="password" id="adminPass" placeholder="管理员密码" />
+    <button class="btn" onclick="adminLogin()">登录</button>
+  </div>
+</div>
+
+<!-- ==================== Page 4: Admin Dashboard ==================== -->
+<div class="page" id="page-admin">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <div class="title" style="margin:0">客户报告列表</div>
+    <button class="btn outline" style="width:auto;padding:8px 16px;font-size:13px" onclick="adminLogout()">退出</button>
+  </div>
+
+  <input class="input" type="text" id="searchPhone" placeholder="按手机号搜索..." oninput="loadReports()" />
+
+  <div style="overflow-x:auto">
+    <table class="admin-table" id="reportTable">
+      <thead>
+        <tr><th>姓名</th><th>手机</th><th>日期</th><th>异常项</th><th>状态</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="card" id="detailCard" style="display:none">
+    <div class="sub">报告详情</div>
+    <div id="detailContent"></div>
+    <div style="margin-top:12px">
+      <select class="input" id="statusSelect" onchange="updateStatus()">
+        <option value="待跟进">待跟进</option>
+        <option value="已回访">已回访</option>
+        <option value="已完成">已完成</option>
+      </select>
+      <textarea class="input" id="notesInput" placeholder="备注..." rows="3" onblur="updateNotes()"></textarea>
+    </div>
+    <button class="btn outline" style="width:auto;margin-top:8px" onclick="exportReport()">导出此报告</button>
+  </div>
+</div>
+
+<!-- ==================== Nav ==================== -->
+<nav class="nav" id="mainNav">
+  <button class="nav-item active" data-page="page-upload" onclick="switchPage('page-upload')">
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7.5L7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5"/></svg>
+    上传报告
+  </button>
+  <button class="nav-item" data-page="page-chat" onclick="switchPage('page-chat')">
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8.625 9.75a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375m-13.5 3.01c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 01.778-.332 48.294 48.294 0 005.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"/></svg>
+    问小暖
+  </button>
+  <button class="nav-item" data-page="page-admin-login" onclick="switchPage('page-admin-login')">
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+    后台
+  </button>
+</nav>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ============ CONFIG ============
+const SUPABASE_URL = "https://backend.appmiaoda.com/projects/supabase321161221187354624";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoyMDk1OTk4MDAyLCJpc3MiOiJzdXBhYmFzZSIsInJvbGUiOiJhbm9uIiwic3ViIjoiYW5vbiJ9.-dDXP5h2biBJICF-djb5NUiCdDWsUJBSr7czWaFHuVY";
+const EDGE_URL = SUPABASE_URL + "/functions/v1/ocr-report";
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let adminToken = localStorage.getItem("admin_token") || "";
+let currentDetailId = null;
+
+// ============ NAVIGATION ============
+function switchPage(pageId) {
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  document.getElementById(pageId).classList.add("active");
+  document.querySelectorAll(".nav-item").forEach(n => {
+    n.classList.toggle("active", n.dataset.page === pageId);
+  });
+
+  // Show/hide nav
+  const isAdmin = pageId === "page-admin";
+  document.getElementById("mainNav").style.display = isAdmin ? "none" : "flex";
+
+  if (pageId === "page-admin-login" && adminToken) {
+    switchPage("page-admin");
+  }
+  if (pageId === "page-admin") loadReports();
+}
+
+// ============ TOAST ============
+function toast(msg, isError) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.className = "toast " + (isError ? "error" : "") + " show";
+  setTimeout(() => t.classList.remove("show"), 2500);
+}
+
+// ============ UPLOAD ============
+let currentImageBase64 = "";
+
+document.getElementById("uploadZone").addEventListener("click", () => {
+  document.getElementById("fileInput").click();
+});
+
+document.getElementById("fileInput").addEventListener("change", handleFile);
+
+function handleFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    currentImageBase64 = ev.target.result.split(",")[1];
+    document.getElementById("previewImg").src = ev.target.result;
+    document.getElementById("previewImg").style.display = "block";
+    document.getElementById("submitBtn").disabled = false;
+  };
+  reader.readAsDataURL(file);
+}
+
+document.getElementById("submitBtn").addEventListener("click", submitReport);
+
+async function submitReport() {
+  const name = document.getElementById("customerName").value.trim();
+  const phone = document.getElementById("customerPhone").value.trim();
+  if (!name || !phone) return toast("请填写姓名和手机号", true);
+  if (phone.length !== 11) return toast("请输入正确的手机号", true);
+
+  document.getElementById("loadingSpinner").style.display = "block";
+  document.getElementById("submitBtn").disabled = true;
+
+  try {
+    const res = await fetch(EDGE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image: currentImageBase64, name, phone })
+    });
+    const data = await res.json();
+
+    document.getElementById("loadingSpinner").style.display = "none";
+
+    if (data.error) {
+      // Fallback: save without AI
+      toast("AI 识别失败，已保存原始数据", true);
+      await saveToDB(name, phone, [], "");
+      document.getElementById("resultCard").style.display = "none";
+    } else if (data.indicators) {
+      renderIndicators(data.indicators);
+      document.getElementById("resultCard").style.display = "block";
+      toast("识别完成");
+      await saveToDB(name, phone, data.indicators, data.raw_text || "");
+    } else {
+      toast("未识别到指标，请重试", true);
+    }
+  } catch (err) {
+    document.getElementById("loadingSpinner").style.display = "none";
+    toast("网络错误: " + err.message, true);
+  }
+}
+
+function renderIndicators(indicators) {
+  const list = document.getElementById("indicatorList");
+  list.innerHTML = indicators.map(i => {
+    let cls = "indicator-normal";
+    if (i.direction === "up") cls = "indicator-up";
+    else if (i.direction === "down") cls = "indicator-down";
+    return `<div class="indicator-row">
+      <span class="indicator-name">${i.name}</span>
+      <span class="indicator-val ${cls}">${i.value} ${i.unit||""}</span>
+    </div>`;
+  }).join("");
+}
+
+async function saveToDB(name, phone, indicators, rawText) {
+  try {
+    await supabase.from("reports").insert({
+      customer_name: name,
+      phone: phone,
+      indicators: indicators,
+      raw_text: rawText,
+      status: "待跟进"
+    });
+  } catch (e) {
+    console.error("Save error:", e);
+  }
+}
+
+function resetForm() {
+  document.getElementById("customerName").value = "";
+  document.getElementById("customerPhone").value = "";
+  document.getElementById("previewImg").style.display = "none";
+  document.getElementById("resultCard").style.display = "none";
+  document.getElementById("submitBtn").disabled = true;
+  currentImageBase64 = "";
+}
+
+// ============ CHAT ============
+async function sendChat() {
+  const input = document.getElementById("chatInput");
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = "";
+
+  appendChat("user", msg);
+  appendChat("assistant", '<div class="spinner" style="margin:4px"></div>', true);
+
+  try {
+    const kb = getKbContext(msg);
+    const prompt = `你是健康知识助手。基于以下知识库回答用户问题。不提供医疗诊断、不开药方、不替代医生。如问题超出知识库范围，诚实地说明。
+    
+知识库：
+${kb}
+
+用户问题：${msg}`;
+
+    const res = await fetch(EDGE_URL + "-chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: msg, knowledge: kb })
+    });
+
+    const data = await res.json();
+    const reply = data.choices?.[0]?.message?.content || "抱歉，暂时无法回答。";
+
+    // Remove last spinner msg
+    const msgs = document.querySelectorAll("#chatArea .chat-msg.assistant");
+    if (msgs.length) msgs[msgs.length - 1].remove();
+
+    appendChat("assistant", reply);
+  } catch (e) {
+    const msgs = document.querySelectorAll("#chatArea .chat-msg.assistant");
+    if (msgs.length) msgs[msgs.length - 1].remove();
+    appendChat("assistant", "网络错误，请稍后重试。");
+  }
+}
+
+function appendChat(role, text, isTemp) {
+  const area = document.getElementById("chatArea");
+  const div = document.createElement("div");
+  div.className = "chat-msg " + role;
+  div.innerHTML = `<div class="chat-bubble">${text}</div>`;
+  area.appendChild(div);
+  if (!isTemp) area.scrollTop = area.scrollHeight;
+}
+
+function getKbContext(query) {
+  // Simple keyword-based KB
+  const kb = {
+    "血压": "正常血压：收缩压90-140mmHg，舒张压60-90mmHg。高血压需注意低盐饮食、规律运动。",
+    "血糖": "空腹血糖正常值3.9-6.1mmol/L。餐后2小时<7.8mmol/L。高血糖需控制碳水化合物摄入。",
+    "血脂": "总胆固醇<5.2mmol/L，甘油三酯<1.7mmol/L，LDL<3.4mmol/L，HDL>1.0mmol/L。",
+    "尿酸": "男性<420μmol/L，女性<360μmol/L。高尿酸需限制海鲜、动物内脏、啤酒。",
+    "肝功": "ALT/AST正常值<40U/L。升高提示肝细胞损伤，需戒酒、避免熬夜。",
+    "肾功": "肌酐正常值44-133μmol/L，尿素氮2.9-8.2mmol/L。",
+    "体重": "BMI=体重(kg)/身高(m)²，正常范围18.5-24。",
+  };
+
+  let result = [];
+  for (const [k, v] of Object.entries(kb)) {
+    if (query.includes(k)) result.push(v);
+  }
+  if (result.length === 0) result = Object.values(kb).slice(0, 3);
+  return result.join("\n\n");
+}
+
+document.getElementById("chatInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") sendChat();
+});
+
+// ============ ADMIN ============
+async function adminLogin() {
+  const user = document.getElementById("adminUser").value.trim();
+  const pass = document.getElementById("adminPass").value.trim();
+
+  // Simple SHA256 compare
+  const encoder = new TextEncoder();
+  const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(pass));
+  const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2,"0")).join("");
+
+  const { data, error } = await supabase.from("admins")
+    .select("*").eq("username", user).eq("password_hash", hashHex).single();
+
+  if (data) {
+    adminToken = hashHex;
+    localStorage.setItem("admin_token", adminToken);
+    switchPage("page-admin");
+    toast("登录成功");
+  } else {
+    toast("账号或密码错误", true);
+  }
+}
+
+function adminLogout() {
+  adminToken = "";
+  localStorage.removeItem("admin_token");
+  switchPage("page-admin-login");
+}
+
+async function loadReports() {
+  const phone = document.getElementById("searchPhone").value.trim();
+  let query = supabase.from("reports").select("*").order("created_at", { ascending: false }).limit(50);
+
+  if (phone) query = query.ilike("phone", `%${phone}%`);
+
+  const { data, error } = await query;
+  const tbody = document.querySelector("#reportTable tbody");
+  if (error || !data) { tbody.innerHTML = "<tr><td colspan='5'>加载失败</td></tr>"; return; }
+
+  tbody.innerHTML = data.map(r => {
+    const count = r.indicators ? r.indicators.filter(i => i.direction !== "normal").length : 0;
+    const badgeCls = r.status === "待跟进" ? "badge-pending" : "badge-done";
+    return `<tr>
+      <td class="clickable" onclick="showDetail('${r.id}')">${r.customer_name}</td>
+      <td>${r.phone}</td>
+      <td>${r.report_date || r.created_at?.slice(0,10) || "-"}</td>
+      <td>${count} 项</td>
+      <td><span class="badge ${badgeCls}">${r.status}</span></td>
+    </tr>`;
+  }).join("");
+}
+
+async function showDetail(id) {
+  currentDetailId = id;
+  const { data } = await supabase.from("reports").select("*").eq("id", id).single();
+  if (!data) return;
+
+  document.getElementById("detailCard").style.display = "block";
+  document.getElementById("statusSelect").value = data.status || "待跟进";
+  document.getElementById("notesInput").value = data.notes || "";
+
+  let html = `<p><strong>姓名：</strong>${data.customer_name}</p>
+    <p><strong>手机：</strong>${data.phone}</p>
+    <p><strong>时间：</strong>${data.created_at?.slice(0,16) || "-"}</p>
+    <p><strong>状态：</strong><span class="badge ${data.status==='待跟进'?'badge-pending':'badge-done'}">${data.status}</span></p>`;
+
+  if (data.indicators && data.indicators.length > 0) {
+    html += "<hr style='border-color:rgba(255,255,255,0.08);margin:12px 0'><strong>指标：</strong>";
+    data.indicators.forEach(i => {
+      let cls = "indicator-normal";
+      if (i.direction === "up") cls = "indicator-up";
+      else if (i.direction === "down") cls = "indicator-down";
+      html += `<div class="indicator-row"><span>${i.name}</span><span class="${cls}">${i.value} ${i.unit||""}</span></div>`;
+    });
+  }
+
+  document.getElementById("detailContent").innerHTML = html;
+}
+
+async function updateStatus() {
+  if (!currentDetailId) return;
+  const val = document.getElementById("statusSelect").value;
+  await supabase.from("reports").update({ status: val }).eq("id", currentDetailId);
+  loadReports();
+  toast("状态已更新");
+}
+
+async function updateNotes() {
+  if (!currentDetailId) return;
+  const val = document.getElementById("notesInput").value;
+  await supabase.from("reports").update({ notes: val }).eq("id", currentDetailId);
+}
+
+function exportReport() {
+  const content = document.getElementById("detailContent").innerText;
+  const blob = new Blob([content], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `report_${currentDetailId}.txt`;
+  a.click();
+}
+
+// Init
+if (adminToken) {
+  document.getElementById("adminUser").value = "admin";
+}
+</script>
+</body>
+</html>
