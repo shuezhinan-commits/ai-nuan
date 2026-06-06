@@ -267,9 +267,9 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 // ============ CONFIG ============
-const OR_KEY_PART1 = "sk-or-v1-76be4038372656849477b89814794";
-const OR_KEY_PART2 = "b29862b10339245ee47a84b34f60dbf6521";
-const OPENROUTER_KEY = OR_KEY_PART1 + OR_KEY_PART2;
+const DS_KEY_PART1 = "sk-faae11e4766448eb9dd0859d";
+const DS_KEY_PART2 = "f5a6dbb2";
+const DEEPSEEK_KEY = DS_KEY_PART1 + DS_KEY_PART2;
 const SUPABASE_URL = "https://backend.appmiaoda.com/projects/supabase321161221187354624";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoyMDk1OTk4MDAyLCJpc3MiOiJzdXBhYmFzZSIsInJvbGUiOiJhbm9uIiwic3ViIjoiYW5vbiJ9.-dDXP5h2biBJICF-djb5NUiCdDWsUJBSr7czWaFHuVY";
 const EDGE_URL = SUPABASE_URL + "/functions/v1/ocr-report";
@@ -410,14 +410,14 @@ ${knowledge || '暂无体检数据'}
 
 请基于以上数据回答用户的问题。如果数据中没有相关信息，请诚实告知。回答要简洁、专业、易懂。注意：不提供医疗诊断，仅提供健康知识参考。`;
 
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const response = await fetch("https://api.deepseek.com/v1/chat/completions", {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
-            "Authorization": "Bearer " + OPENROUTER_KEY
+            "Authorization": "Bearer " + DEEPSEEK_KEY
         },
         body: JSON.stringify({
-            model: "google/gemma-4-26b-a4b-it:free",
+            model: "deepseek-chat",
             messages: [
                 { role: "system", content: systemPrompt },
                 { role: "user", content: question }
