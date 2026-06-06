@@ -425,7 +425,7 @@ ${kb}
     });
 
     const data = await res.json();
-    const reply = data.choices?.[0]?.message?.content || "抱歉，暂时无法回答。";
+    const reply = data.reply || data.choices?.[0]?.message?.content || "抱歉，暂时无法回答。";
 
     // Remove last spinner msg
     const msgs = document.querySelectorAll("#chatArea .chat-msg.assistant");
